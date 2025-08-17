@@ -60,9 +60,9 @@ def _rounded_shadow_rgba(size: Tuple[int, int], radius: int = 24, shadow: int = 
     canvas = Image.new("RGBA", (w + shadow * 2, h + shadow * 2), (0, 0, 0, 0))
     mask = Image.new("L", (w, h), 0)
     ImageDraw.Draw(mask).rounded_rectangle((0, 0, w, h), radius=radius, fill=255)
-    shadow_img = Image.new("RGBA", (w, h), (0, 0, 0, 120))
+    shadow_img = Image.new("RGBA", (w, h), (0, 0, 0, 140))
     canvas.paste(shadow_img, (shadow, shadow), mask)
-    canvas = canvas.filter(ImageFilter.GaussianBlur(8))
+    canvas = canvas.filter(ImageFilter.GaussianBlur(10))
     return canvas
 
 def _apply_rounded(img: Image.Image, radius: int = 24) -> Image.Image:
@@ -134,81 +134,100 @@ def fmt_age(days: int) -> str:
 class RippleButton(ctk.CTkButton):
     def __init__(self, master, **kwargs):
         super().__init__(master, **kwargs)
-        self._base_width = kwargs.get("width", 90)
-        self._base_height = kwargs.get("height", 36)
+        self._base_width = self.cget("width") or 0
+        self._base_height = self.cget("height") or 0
         self.bind("<Button-1>", self._pulse, add="+")
     def _pulse(self, _evt=None):
         w0, h0 = self._base_width, self._base_height
+        if w0 == 0 or h0 == 0:
+            return
         def step(i):
-            if i <= 5:
-                k = 1 - i * 0.02
+            if i <= 4:
+                k = 1 - i * 0.03
                 self.configure(width=int(w0 * k), height=int(h0 * k))
                 self.after(12, lambda: step(i + 1))
-            elif i <= 10:
-                k = 1 - (10 - i) * 0.02
+            elif i <= 8:
+                k = 1 - (8 - i) * 0.03
                 self.configure(width=int(w0 * k), height=int(h0 * k))
                 self.after(12, lambda: step(i + 1))
             else:
                 self.configure(width=w0, height=h0)
         step(0)
 
+class CategoryChip(ctk.CTkButton):
+    def __init__(self, master, text="", **kwargs):
+        super().__init__(master, text=text, height=28, corner_radius=14, **kwargs)
+        self._font0 = ctk.CTkFont(size=12)
+        self._font1 = ctk.CTkFont(size=13)
+        self.configure(font=self._font0)
+        self.bind("<Enter>", self._enter)
+        self.bind("<Leave>", self._leave)
+    def _enter(self, _):
+        self.configure(font=self._font1)
+    def _leave(self, _):
+        self.configure(font=self._font0)
+
 class SlidingSidebar(ctk.CTkFrame):
-    def __init__(self, master, width=240, **kwargs):
-        super().__init__(master, width=width, fg_color=("#0f0f0f", "#0f0f0f"), **kwargs)
-        self._width = width
+    def __init__(self, master, grid_host, width=240, **kwargs):
+        super().__init__(grid_host, width=width, fg_color=("#0f0f0f", "#0f0f0f"), **kwargs)
+        self._grid_host = grid_host
+        self._target_width = width
+        self._cur = width
         self._visible = True
-    def slide_to(self, x_target: int, duration_ms: int = 160):
+        self.grid(row=1, column=0, sticky="nsw")
+        self._apply_width(width)
+    def _apply_width(self, w):
+        self._grid_host.grid_columnconfigure(0, minsize=w)
+        self.configure(width=w)
+    def toggle(self):
+        self.slide_to(0 if self._visible else self._target_width)
+        self._visible = not self._visible
+    def slide_to(self, w_target: int, duration_ms: int = 160):
         steps = 16
-        x0 = self.winfo_x()
-        dx = (x_target - x0) / steps
+        w0 = self._cur
+        dw = (w_target - w0) / steps
         i = 0
         def anim():
             nonlocal i
             if i < steps:
-                self.place(x=int(x0 + dx * i), rely=0, relheight=1)
+                cur = int(w0 + dw * i)
+                self._apply_width(cur)
                 i += 1
                 self.after(duration_ms // steps, anim)
             else:
-                self.place(x=x_target, rely=0, relheight=1)
+                self._cur = w_target
+                self._apply_width(w_target)
         anim()
-    def toggle(self):
-        if self._visible:
-            self._visible = False
-            self.slide_to(-self._width)
-        else:
-            self._visible = True
-            self.slide_to(0)
 
 class HoverThumb(ctk.CTkButton):
     def __init__(self, master, images: List[Image.Image], command=None, **kwargs):
         self.thumb_size = kwargs.pop("thumb_size", (320, 180))
-        super().__init__(master, text="", fg_color="transparent", command=command, **kwargs)
-        self._frames_norm = [ctk.CTkImage(light_image=im, dark_image=im, size=self.thumb_size) for im in images]
-        hover_sz = (int(self.thumb_size[0] * 1.05), int(self.thumb_size[1] * 1.05))
-        self._frames_hover = [ctk.CTkImage(light_image=im, dark_image=im, size=hover_sz) for im in images]
+        super().__init__(master, text="", fg_color="transparent", hover=False, border_width=0, command=command, **kwargs)
+        self._frames = [ctk.CTkImage(light_image=im, dark_image=im, size=self.thumb_size) for im in images]
+        self._hover_frames = [ctk.CTkImage(light_image=im, dark_image=im, size=(int(self.thumb_size[0]*1.04), int(self.thumb_size[1]*1.04))) for im in images]
         self._hover = False
         self._idx = 0
-        self.configure(image=self._frames_norm[0])
+        self.configure(image=self._frames[0])
         self.bind("<Enter>", self._enter, add="+")
         self.bind("<Leave>", self._leave, add="+")
         self._cycle_job = None
     def _enter(self, _e=None):
         self._hover = True
-        self.configure(image=self._frames_hover[self._idx % len(self._frames_hover)])
+        self.configure(image=self._hover_frames[self._idx])
         self._start_cycle()
     def _leave(self, _e=None):
         self._hover = False
-        self.configure(image=self._frames_norm[self._idx % len(self._frames_norm)])
+        self.configure(image=self._frames[self._idx])
         if self._cycle_job:
             self.after_cancel(self._cycle_job)
             self._cycle_job = None
     def _start_cycle(self):
         def tick():
-            self._idx = (self._idx + 1) % len(self._frames_norm)
-            self.configure(image=(self._frames_hover[self._idx] if self._hover else self._frames_norm[self._idx]))
-            self._cycle_job = self.after(400, tick)
+            self._idx = (self._idx + 1) % len(self._frames)
+            self.configure(image=self._hover_frames[self._idx] if self._hover else self._frames[self._idx])
+            self._cycle_job = self.after(300, tick)
         if not self._cycle_job:
-            self._cycle_job = self.after(400, tick)
+            self._cycle_job = self.after(300, tick)
 
 class AnimatedProgressBar(ctk.CTkProgressBar):
     def __init__(self, master, **kwargs):
@@ -252,7 +271,7 @@ class HeaderBar(ctk.CTkFrame):
         self.upload_btn.grid(row=0, column=5, padx=(16, 6))
         self.bell_btn = RippleButton(self, text="🔔", width=44, height=36, corner_radius=10)
         self.bell_btn.grid(row=0, column=6, padx=(6, 6))
-        self.avatar = ctk.CTkLabel(self, text="J", width=36, height=36, corner_radius=18, fg_color="#3d3d3d")
+        self.avatar = ctk.CTkLabel(self, text="A", width=36, height=36, corner_radius=18, fg_color="#3d3d3d")
         self.avatar.grid(row=0, column=7, padx=(6, 12))
         self.grid_columnconfigure(2, weight=1)
 
@@ -260,9 +279,10 @@ class SideNav(ctk.CTkFrame):
     def __init__(self, master, on_nav: Callable[[str], None]):
         super().__init__(master, fg_color=("#0f0f0f", "#0f0f0f"))
         self.on_nav = on_nav
-        ctk.CTkLabel(self, text="Navigation", font=("Segoe UI", 11), anchor="w").pack(fill="x", padx=16, pady=(12, 6))
+        ctk.CTkLabel(self, text="Navigation", anchor="w").pack(fill="x", padx=16, pady=(12, 6))
         for emoji, label, key in [
             ("🏠", "Home", "home"),
+            ("🎬", "Scenes", "scenes"),
             ("📺", "Subscriptions", "subs"),
             ("📚", "Library", "library"),
             ("🕘", "History", "history"),
@@ -346,7 +366,7 @@ class HomeView(ctk.CTkFrame):
         chipbar = ctk.CTkFrame(self, fg_color="#0f0f0f")
         chipbar.pack(fill="x", padx=10, pady=(10,0))
         for label in ["All", "Music", "Programming", "Live", "News", "Design", "Shorts", "Podcasts"]:
-            RippleButton(chipbar, text=label, height=28, corner_radius=14).pack(side="left", padx=6, pady=6)
+            CategoryChip(chipbar, text=label).pack(side="left", padx=6, pady=6)
         self.grid_v = VideoGrid(self, on_open=on_open)
         self.grid_v.pack(fill="both", expand=True, padx=6, pady=6)
         self.grid_v.populate(MOCK_VIDEOS)
@@ -363,16 +383,15 @@ class App(ctk.CTk):
         self.minsize(980, 600)
         self.header = HeaderBar(self, on_search=self._on_search)
         self.header.grid(row=0, column=0, columnspan=2, sticky="ew")
-        self.sidebar = SlidingSidebar(self, width=240)
-        self.sidebar.place(x=0, rely=0, relheight=1)
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(1, weight=1)
+        self.sidebar = SlidingSidebar(self, self, width=240)
         self.sidenav = SideNav(self.sidebar, on_nav=self._on_nav)
         self.sidenav.pack(fill="y", expand=True)
         self.content = ctk.CTkFrame(self, fg_color="transparent")
         self.content.grid(row=1, column=1, sticky="nsew")
         self.home = HomeView(self.content, on_open=self._open_video)
         self.home.pack(fill="both", expand=True)
-        self.grid_rowconfigure(1, weight=1)
-        self.grid_columnconfigure(1, weight=1)
         self.bind("<Configure>", self._on_resize)
     def toggle_sidebar(self):
         self.sidebar.toggle()
@@ -393,9 +412,10 @@ class App(ctk.CTk):
         PlayerOverlay(self, video)
     def _on_resize(self, _evt=None):
         width = self.winfo_width()
-        if width < 1100 and self.sidebar._visible:
+        want_open = width >= 1100
+        if want_open and not self.sidebar._visible:
             self.sidebar.toggle()
-        elif width >= 1100 and not self.sidebar._visible:
+        elif not want_open and self.sidebar._visible:
             self.sidebar.toggle()
 
 if __name__ == "__main__":
