@@ -1,7 +1,6 @@
 """
 YouTube‑style GUI built with customtkinter
 -------------------------------------------------
-Run with:  python youtube_gui.py
 
 Notes
 - Purely local demo (no network).
@@ -14,7 +13,6 @@ Notes
 import os
 import sys
 import random
-import datetime as dt
 from dataclasses import dataclass
 from typing import Callable, List
 
