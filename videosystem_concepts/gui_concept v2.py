@@ -89,8 +89,10 @@ def make_thumb(text: str, color=(220, 20, 60), size=(480, 270)):
     key = (text, color, size)
     if key in ASSET_CACHE:
         return ASSET_CACHE[key]
-    img = Image.new("RGB", size, color)
+    img = Image.new("RGBA", size, color)
     draw = ImageDraw.Draw(img)
+    font = ImageFont.load_default()
+
     # Semi-transparent play triangle
     overlay = Image.new("RGBA", size, (0, 0, 0, 0))
     od = ImageDraw.Draw(overlay)
@@ -100,6 +102,19 @@ def make_thumb(text: str, color=(220, 20, 60), size=(480, 270)):
     points = [(cx - tri_w // 3, cy - tri_h // 2), (cx - tri_w // 3, cy + tri_h // 2), (cx + tri_w, cy)]
     od.polygon(points, fill=(255, 255, 255, 150))
     img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
+
+    # place text
+    bbox = draw.textbbox((0, 0), text, font=font)
+    w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+
+    draw.text(((size[0] - w) // 2, (size[1] - h) // 2), text, fill="white", font=font)
+
+    # round the edges
+    mask = Image.new("L", size, 0)
+    mask_draw = ImageDraw.Draw(mask)
+    mask_draw.rounded_rectangle([0, 0, size[0], size[1]], radius=20, fill=255)
+    img.putalpha(mask)
+
 
     # Title text (fit with wrap)
     try:
@@ -136,6 +151,15 @@ def make_thumb(text: str, color=(220, 20, 60), size=(480, 270)):
     return_img = img.convert("RGBA")
     ASSET_CACHE[key] = return_img
     return return_img
+
+#Rounded thumbnail function
+def round_corners(img: Image.Image, radius: int = 20) -> Image.Image:
+    img = img.convert("RGBA")
+    mask = Image.new("L", img.size, 0)
+    draw = ImageDraw.Draw(mask)
+    draw.rounded_rectangle([0, 0, img.size[0], img.size[1]], radius, fill=255)
+    img.putalpha(mask)
+    return img
 
 
 def fmt_views(v: int) -> str:
@@ -236,7 +260,7 @@ class SideBar(ctk.CTkFrame):
         for child in self.winfo_children():
             child.destroy()
         if collapsed:
-            for emoji, key in [("🏠","home"),("🎬", "scenes"),("📺","subs"),("📚","library"),("🕘","history"),("❤️","liked")]:
+            for emoji, key in [("🏠","home"),("🎬", "scenes"),("📺","subs"),("📚","library"),("🕘","history"),("<3","liked")]:
                 ctk.CTkButton(self, text=emoji, width=48, height=48, corner_radius=16,
                               command=lambda k=key: self.on_nav(k)).pack(padx=8, pady=6)
         else:
@@ -251,8 +275,8 @@ class VideoCard(ctk.CTkFrame):
 
         # Thumbnail
         img = make_thumb(video.title, color=video.color)
-        self.thumb_img = ctk.CTkImage(light_image=img, dark_image=img, size=(320, 180))
-        self.thumb_btn = ctk.CTkButton(self, text="", image=self.thumb_img, width=320, height=180,
+        self.thumb_img = ctk.CTkImage(light_image=img, dark_image=img, size=(250, 130))
+        self.thumb_btn = ctk.CTkButton(self, text="", image=self.thumb_img, width=250, height=130,
                                        corner_radius=12, command=self._clicked)
         self.thumb_btn.grid(row=0, column=0, columnspan=2, sticky="nsew")
 
@@ -347,7 +371,7 @@ class HomeView(ctk.CTkFrame):
         chipbar = ctk.CTkFrame(self, fg_color="#0f0f0f")
         chipbar.pack(fill="x", padx=10, pady=(10,0))
         for label in ["#All", "#Music", "#Programming", "#Live", "#News", "#Design", "#Shorts", "#Podcasts"]:
-            ctk.CTkButton(chipbar, text=label, height=28, corner_radius=14).pack(side="left", padx=6, pady=6)
+            ctk.CTkButton(chipbar, text=label, height=28, width=125, corner_radius=14).pack(side="left", padx=6, pady=6)
 
         # Grid of videos
         self.grid_v = VideoGrid(self, on_open=on_open)
