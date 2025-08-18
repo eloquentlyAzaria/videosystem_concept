@@ -236,7 +236,7 @@ class SideBar(ctk.CTkFrame):
         for child in self.winfo_children():
             child.destroy()
         if collapsed:
-            for emoji, key in [("🏠","home"),("📺","subs"),("📚","library"),("🕘","history"),("❤️","liked")]:
+            for emoji, key in [("🏠","home"),("🎬", "scenes"),("📺","subs"),("📚","library"),("🕘","history"),("❤️","liked")]:
                 ctk.CTkButton(self, text=emoji, width=48, height=48, corner_radius=16,
                               command=lambda k=key: self.on_nav(k)).pack(padx=8, pady=6)
         else:
@@ -337,8 +337,6 @@ class PlayerOverlay(ctk.CTkToplevel):
         self.grid_columnconfigure(1, weight=0)   # keep sidebar fixed
         self.grid_rowconfigure(0, weight=1)
 
-        # Close button
-        ctk.CTkButton(self, text="✕ Close", command=self.destroy).grid(row=1, column=0, columnspan=2, pady=(0,10))
 
 
 class HomeView(ctk.CTkFrame):
@@ -348,7 +346,7 @@ class HomeView(ctk.CTkFrame):
         # Filter row (chips)
         chipbar = ctk.CTkFrame(self, fg_color="#0f0f0f")
         chipbar.pack(fill="x", padx=10, pady=(10,0))
-        for label in ["All", "Music", "Programming", "Live", "News", "Design", "Shorts", "Podcasts"]:
+        for label in ["#All", "#Music", "#Programming", "#Live", "#News", "#Design", "#Shorts", "#Podcasts"]:
             ctk.CTkButton(chipbar, text=label, height=28, corner_radius=14).pack(side="left", padx=6, pady=6)
 
         # Grid of videos
