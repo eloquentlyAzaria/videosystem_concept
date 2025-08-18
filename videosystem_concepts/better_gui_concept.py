@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Callable, List, Tuple
 
 import customtkinter as ctk
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 @dataclass
 class Video:
@@ -295,9 +295,9 @@ class VideoCard(ctk.CTkFrame):
         super().__init__(master, fg_color="transparent")
         self.video = video
         self.on_open = on_open
-        base = make_thumb(video.title, color=video.color, size=(480, 270))
-        alt1 = make_thumb(video.title, color=tuple(min(255, int(c * 1.05)) for c in video.color), size=(480, 270))
-        alt2 = make_thumb(video.title, color=tuple(max(0, int(c * 0.92)) for c in video.color), size=(480, 270))
+        base = make_thumb(video.title, size=(480, 270))
+        alt1 = make_thumb(video.title, size=(480, 270))
+        alt2 = make_thumb(video.title, size=(480, 270))
         images = [base, alt1, alt2]
         self.thumb_btn = HoverThumb(self, images, thumb_size=(320, 180), command=self._clicked)
         self.thumb_btn.grid(row=0, column=0, columnspan=2, sticky="nsew")
